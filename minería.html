@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minería en México</title>
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <!-- MarkerCluster -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+  />
+
+  <style>
+    :root {
+      --carbon: #191714;
+      --carbon-soft: #26231f;
+      --obsidian: #0f0e0c;
+      --gold: #d4af37;
+      --copper: #b87333;
+      --silver: #c0c0c0;
+      --iron: #5a5a5a;
+      --lithium: #8a6cff;
+      --zinc: #6fa8dc;
+
+      --risk-low: #d4af37;
+      --risk-medium: #b87333;
+      --risk-high: #e85d04;
+      --risk-critical: #9d0208;
+
+      --text-light: #f6f1e7;
+      --text-muted: #c8bfae;
+      --panel-bg: rgba(25, 23, 20, 0.92);
+      --panel-border: rgba(212, 175, 55, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--obsidian);
+      color: var(--text-light);
+      overflow: hidden;
+    }
+
+    #app {
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 310px 1fr 330px;
+      grid-template-rows: 78px 1fr;
+      grid-template-areas:
+        "header header header"
+        "left map right";
+    }
+
+    header {
+      grid-area: header;
+      background: linear-gradient(
+        90deg,
+        #0f0e0c 0%,
+        #2a2116 42%,
+        #4a2f18 100%
+      );
+      border-bottom: 2px solid var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      z-index: 1000;
+      box-shadow: 0 4px 22px rgba(0, 0, 0, 0.55);
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 0.5px;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    .title-block p {
+      margin: 3px 0 0;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .header-badge {
+      border: 1px solid rgba(212, 175, 55, 0.55);
+      color: var(--text-light);
+      background: rgba(0, 0, 0, 0.25);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      letter-spacing: 0.4px;
+    }
+
+    #left-panel {
+      grid-area: left;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--panel-border);
+      padding: 20px;
+      overflow-y: auto;
+      z-index: 900;
+    }
+
+    #right-panel {
+      grid-area: right;
+      background: var(--panel-bg);
+      border-left: 1px solid var(--panel-border);
+      padding: 20px;
+      overflow-y: auto;
+      z-index: 900;
+    }
+
+    #map {
+      grid-area: map;
+      width: 100%;
+      height: 100%;
+      background: #1f1d19;
+      z-index: 1;
+    }
+
+    .panel-section {
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(212, 175, 55, 0.22);
+    }
+
+    .panel-section h2 {
+      margin: 0 0 10px;
+      color: var(--gold);
+      font-size: 18px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .panel-section h3 {
+      margin: 12px 0 6px;
+      color: var(--text-light);
+      font-size: 15px;
+    }
+
+    .panel-section p {
+      margin: 0 0 10px;
+      color: var(--text-muted);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .story-card {
+      background: linear-gradient(
+        180deg,
+        rgba(212, 175, 55, 0.12),
+        rgba(184, 115, 51, 0.08)
+      );
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      border-radius: 14px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+
+    .story-card strong {
+      color: var(--gold);
+    }
+
+    .control-label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin: 12px 0 6px;
+    }
+
+    select,
+    button {
+      width: 100%;
+      border: 1px solid rgba(212, 175, 55, 0.45);
+      background: #211d18;
+      color: var(--text-light);
+      padding: 10px 11px;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    button {
+      margin-top: 10px;
+      cursor: pointer;
+      background: linear-gradient(90deg, #8f4f1f, #b87333);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    button:hover {
+      filter: brightness(1.12);
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .stat-card {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-card span {
+      display: block;
+      color: var(--gold);
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .stat-card small {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 9px 0;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .legend-symbol {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.75);
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.18);
+      flex: 0 0 auto;
+    }
+
+    .risk-bar {
+      height: 12px;
+      width: 100%;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        var(--risk-low),
+        var(--risk-medium),
+        var(--risk-high),
+        var(--risk-critical)
+      );
+      margin: 12px 0 8px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .risk-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .popup-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #3c2415;
+      margin-bottom: 6px;
+    }
+
+    .popup-row {
+      margin: 4px 0;
+      font-size: 13px;
+    }
+
+    .popup-tag {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    .leaflet-tooltip.mine-tooltip {
+      background: rgba(25, 23, 20, 0.92);
+      color: var(--gold);
+      border: 1px solid var(--gold);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      border-radius: 8px;
+      font-weight: 700;
+    }
+
+    .mine-marker {
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      box-shadow:
+        0 0 0 4px rgba(0, 0, 0, 0.28),
+        0 0 18px rgba(212, 175, 55, 0.75);
+    }
+
+    .leaflet-control-layers {
+      background: rgba(25, 23, 20, 0.94) !important;
+      color: var(--text-light) !important;
+      border: 1px solid rgba(212, 175, 55, 0.45) !important;
+      border-radius: 12px !important;
+    }
+
+    .leaflet-control-layers label {
+      color: var(--text-light);
+      font-size: 13px;
+    }
+
+    .leaflet-control-zoom a {
+      background: rgba(25, 23, 20, 0.95) !important;
+      color: var(--gold) !important;
+      border-color: rgba(212, 175, 55, 0.35) !important;
+    }
+
+    @media (max-width: 1100px) {
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: 80px 190px 1fr 220px;
+        grid-template-areas:
+          "header"
+          "left"
+          "map"
+          "right";
+      }
+
+      #left-panel,
+      #right-panel {
+        overflow-y: auto;
+      }
+
+      header {
+        padding: 0 16px;
+      }
+
+      .title-block h1 {
+        font-size: 22px;
+      }
+
+      .header-badge {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <header>
+      <div class="title-block">
+        <h1>Minería en México</h1>
+        <p>Geoportal interactivo de proyectos mineros, riesgo territorial y amenazas socioambientales</p>
+      </div>
+      <div class="header-badge">Leaflet · Open Source · Geoportal</div>
+    </header>
+
+    <aside id="left-panel">
+      <div class="panel-section">
+        <h2>Lectura del mapa</h2>
+        <p>
+          Este geoportal representa proyectos mineros en México mediante una
+          simbología asociada a minerales, riesgo e intensidad territorial.
+        </p>
+
+        <div class="story-card">
+          <p>
+            <strong>Interpretación:</strong> los círculos muestran proyectos
+            mineros. El color representa el mineral principal y el tamaño
+            representa el nivel de riesgo o amenaza.
+          </p>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h2>Filtros</h2>
+
+        <label class="control-label" for="mineralFilter">Mineral principal</label>
+        <select id="mineralFilter">
+          <option value="Todos">Todos</option>
+          <option value="Oro">Oro</option>
+          <option value="Plata">Plata</option>
+          <option value="Cobre">Cobre</option>
+          <option value="Litio">Litio</option>
+          <option value="Hierro">Hierro</option>
+          <option value="Zinc">Zinc</option>
+        </select>
+
+        <label class="control-label" for="riskFilter">Nivel de riesgo</label>
+        <select id="riskFilter">
+          <option value="Todos">Todos</option>
+          <option value="Bajo">Bajo</option>
+          <option value="Medio">Medio</option>
+          <option value="Alto">Alto</option>
+          <option value="Crítico">Crítico</option>
+        </select>
+
+        <button onclick="resetFilters()">Restablecer filtros</button>
+      </div>
+
+      <div class="panel-section">
+        <h2>Capas disponibles</h2>
+        <p>
+          El mapa incluye tres bases cartográficas: satelital, OpenStreetMap y
+          una base sobria. Además, contiene una capa puntual de proyectos
+          mineros y una capa de calor de amenaza.
+        </p>
+      </div>
+    </aside>
+
+    <main id="map"></main>
+
+    <aside id="right-panel">
+      <div class="panel-section">
+        <h2>Resumen</h2>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span id="totalProjects">0</span>
+            <small>Proyectos visibles</small>
+          </div>
+          <div class="stat-card">
+            <span id="criticalProjects">0</span>
+            <small>Riesgo crítico</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h2>Simbología minera</h2>
+
+        <div class="legend-item">
+          <span class="legend-symbol" style="background:#d4af37;"></span>
+          Oro
+        </div>
+        <div class="legend-item">
+          <span class="legend-symbol" style="background:#c0c0c0;"></span>
+          Plata
+        </div>
+        <div class="legend-item">
+          <span class="legend-symbol" style="background:#b87333;"></span>
+          Cobre
+        </div>
+        <div class="legend-item">
+          <span class="legend-symbol" style="background:#8a6cff;"></span>
+          Litio
+        </div>
+        <div class="legend-item">
+          <span class="legend-symbol" style="background:#5a5a5a;"></span>
+          Hierro
+        </div>
+        <div class="legend-item">
+          <span class="legend-symbol" style="background:#6fa8dc;"></span>
+          Zinc
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h2>Riesgo / amenaza</h2>
+        <div class="risk-bar"></div>
+        <div class="risk-labels">
+          <span>Bajo</span>
+          <span>Medio</span>
+          <span>Alto</span>
+          <span>Crítico</span>
+        </div>
+        <p style="margin-top:12px;">
+          El tamaño de los símbolos aumenta conforme crece el nivel de riesgo.
+          Los proyectos críticos aparecen con mayor intensidad visual.
+        </p>
+      </div>
+
+      <div class="panel-section">
+        <h2>Nota metodológica</h2>
+        <p>
+          Los datos incluidos son de ejemplo. Puedes reemplazarlos por una capa
+          GeoJSON real conservando los campos:
+          <strong>nombre</strong>, <strong>mineral</strong>,
+          <strong>estado</strong>, <strong>etapa</strong>,
+          <strong>riesgo</strong> y <strong>amenaza</strong>.
+        </p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- MarkerCluster -->
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- Leaflet Heat -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <script>
+    // =========================================================
+    // 1. MAPA BASE
+    // =========================================================
+
+    const map = L.map("map", {
+      center: [23.6345, -102.5528],
+      zoom: 5,
+      minZoom: 4,
+      maxZoom: 18,
+      zoomControl: true
+    });
+
+    const baseOSM = L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }
+    );
+
+    const baseSatelital = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution:
+          "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics"
+      }
+    );
+
+    const baseSobria = L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      {
+        maxZoom: 20,
+        attribution:
+          '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap contributors'
+      }
+    );
+
+    baseSobria.addTo(map);
+
+    // =========================================================
+    // 2. DATOS DE EJEMPLO
+    // Reemplaza este GeoJSON por tu base real.
+    // =========================================================
+
+    const proyectosMineros = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {
+            nombre: "Proyecto Peñasquito",
+            mineral: "Oro",
+            estado: "Zacatecas",
+            etapa: "Operación",
+            riesgo: "Alto",
+            amenaza: 0.82,
+            empresa: "Ejemplo S.A."
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [-101.698, 24.645]
+          }
+        },
+        {
+          type: "Feature",
+          properties: {
+            nombre: "Proyecto Buenavista",
+            mineral: "Cobre",
+            estado: "Sonora",
+            etapa: "Operación",
+            riesgo: "Crítico",
+            amenaza: 0.94,
+            empresa: "Ejemplo S.A."
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [-110.958, 30.987]
+          }
+        },
+        {
+          type: "Feature",
+          properties: {
+            nombre: "Proyecto Bacadéhuachi",
+            mineral: "Litio",
+            estado: "Sonora",
+            etapa: "Exploración",
+            riesgo: "Alto",
+            amenaza: 0.78,
+            empresa: "Ejemplo S.A."
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [-109.137, 29.812]
+          }
+        },
+        {
+          type: "Feature",
+          properties: {
+            nombre: "Proyecto Fresnillo",
+            mineral: "Plata",
+            estado: "Zacatecas",
+            etapa: "Operación",
+            riesgo: "Medio",
+            amenaza: 0.58,
+            empresa: "Ejemplo S.A."
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [-102.871, 23.175]
+          }
+        },
+        {
+          type: "Feature",
+          properties: {
+            nombre: "Proyecto Aquila",
+            mineral: "Hierro",
+            estado: "Michoacán",
+            etapa: "Operación",
+            riesgo: "Crítico",
+            amenaza: 0.91,
+            empresa: "Ejemplo S.A."
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [-103.504, 18.598]
+          }
+        },
+        {
+          type: "Feature",
+          properties: {
+            nombre: "Proyecto Charcas",
+            mineral: "Zinc",
+            estado: "San Luis Potosí",
+            etapa: "Operación",
+            riesgo: "Medio",
+            amenaza: 0.52,
+            empresa: "Ejemplo S.A."
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [-101.113, 23.129]
+          }
+        },
+        {
+          type: "Feature",
+          properties: {
+            nombre: "Proyecto Guerrero Gold Belt",
+            mineral: "Oro",
+            estado: "Guerrero",
+            etapa: "Exploración",
+            riesgo: "Alto",
+            amenaza: 0.80,
+            empresa: "Ejemplo S.A."
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [-99.686, 17.708]
+          }
+        },
+        {
+          type: "Feature",
+          properties: {
+            nombre: "Proyecto Naica",
+            mineral: "Plata",
+            estado: "Chihuahua",
+            etapa: "Cierre / mantenimiento",
+            riesgo: "Bajo",
+            amenaza: 0.30,
+            empresa: "Ejemplo S.A."
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [-105.492, 27.850]
+          }
+        }
+      ]
+    };
+
+    // =========================================================
+    // 3. FUNCIONES DE SIMBOLOGÍA
+    // =========================================================
+
+    function colorMineral(mineral) {
+      const colores = {
+        Oro: "#d4af37",
+        Plata: "#c0c0c0",
+        Cobre: "#b87333",
+        Litio: "#8a6cff",
+        Hierro: "#5a5a5a",
+        Zinc: "#6fa8dc"
+      };
+
+      return colores[mineral] || "#ffffff";
+    }
+
+    function colorRiesgo(riesgo) {
+      const colores = {
+        Bajo: "#d4af37",
+        Medio: "#b87333",
+        Alto: "#e85d04",
+        Crítico: "#9d0208"
+      };
+
+      return colores[riesgo] || "#888888";
+    }
+
+    function radioRiesgo(riesgo) {
+      const radios = {
+        Bajo: 8,
+        Medio: 11,
+        Alto: 15,
+        Crítico: 19
+      };
+
+      return radios[riesgo] || 9;
+    }
+
+    function intensidadAmenaza(valor) {
+      if (valor >= 0.85) return "Muy alta";
+      if (valor >= 0.65) return "Alta";
+      if (valor >= 0.45) return "Media";
+      return "Baja";
+    }
+
+    // =========================================================
+    // 4. CAPAS INTERACTIVAS
+    // =========================================================
+
+    let markerCluster = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      spiderfyOnMaxZoom: true,
+      maxClusterRadius: 45
+    });
+
+    let currentGeoJsonLayer = null;
+    let heatLayer = null;
+
+    function createMiningLayer(data) {
+      if (currentGeoJsonLayer) {
+        markerCluster.removeLayer(currentGeoJsonLayer);
+      }
+
+      currentGeoJsonLayer = L.geoJSON(data, {
+        pointToLayer: function (feature, latlng) {
+          const p = feature.properties;
+
+          return L.circleMarker(latlng, {
+            radius: radioRiesgo(p.riesgo),
+            fillColor: colorMineral(p.mineral),
+            color: colorRiesgo(p.riesgo),
+            weight: p.riesgo === "Crítico" ? 4 : 3,
+            opacity: 1,
+            fillOpacity: 0.82,
+            className: "mine-marker"
+          });
+        },
+
+        onEachFeature: function (feature, layer) {
+          const p = feature.properties;
+
+          const popupContent = `
+            <div class="popup-title">${p.nombre}</div>
+            <div class="popup-row"><strong>Mineral:</strong> ${p.mineral}</div>
+            <div class="popup-row"><strong>Estado:</strong> ${p.estado}</div>
+            <div class="popup-row"><strong>Etapa:</strong> ${p.etapa}</div>
+            <div class="popup-row"><strong>Empresa:</strong> ${p.empresa}</div>
+            <div class="popup-row"><strong>Amenaza:</strong> ${intensidadAmenaza(p.amenaza)} (${p.amenaza})</div>
+            <span class="popup-tag" style="background:${colorRiesgo(p.riesgo)};">
+              Riesgo ${p.riesgo}
+            </span>
+          `;
+
+          layer.bindPopup(popupContent, {
+            maxWidth: 290
+          });
+
+          layer.bindTooltip(
+            `${p.nombre}<br><span style="color:#fff;">${p.mineral} · Riesgo ${p.riesgo}</span>`,
+            {
+              direction: "top",
+              offset: [0, -8],
+              opacity: 0.96,
+              className: "mine-tooltip"
+            }
+          );
+        }
+      });
+
+      markerCluster.addLayer(currentGeoJsonLayer);
+
+      if (!map.hasLayer(markerCluster)) {
+        markerCluster.addTo(map);
+      }
+    }
+
+    function createHeatLayer(data) {
+      if (heatLayer) {
+        map.removeLayer(heatLayer);
+      }
+
+      const heatPoints = data.features.map((feature) => {
+        const coords = feature.geometry.coordinates;
+        const amenaza = feature.properties.amenaza || 0.5;
+
+        return [coords[1], coords[0], amenaza];
+      });
+
+      heatLayer = L.heatLayer(heatPoints, {
+        radius: 38,
+        blur: 28,
+        maxZoom: 10,
+        minOpacity: 0.38,
+        gradient: {
+          0.2: "#d4af37",
+          0.45: "#b87333",
+          0.7: "#e85d04",
+          1.0: "#9d0208"
+        }
+      });
+    }
+
+    // =========================================================
+    // 5. FILTROS
+    // =========================================================
+
+    function filterData() {
+      const mineral = document.getElementById("mineralFilter").value;
+      const riesgo = document.getElementById("riskFilter").value;
+
+      const filtered = {
+        type: "FeatureCollection",
+        features: proyectosMineros.features.filter((feature) => {
+          const p = feature.properties;
+
+          const mineralMatch = mineral === "Todos" || p.mineral === mineral;
+          const riesgoMatch = riesgo === "Todos" || p.riesgo === riesgo;
+
+          return mineralMatch && riesgoMatch;
+        })
+      };
+
+      markerCluster.clearLayers();
+      createMiningLayer(filtered);
+      createHeatLayer(filtered);
+
+      if (map.hasLayer(heatLayer)) {
+        heatLayer.addTo(map);
+      }
+
+      updateStats(filtered);
+    }
+
+    function resetFilters() {
+      document.getElementById("mineralFilter").value = "Todos";
+      document.getElementById("riskFilter").value = "Todos";
+      filterData();
+    }
+
+    document
+      .getElementById("mineralFilter")
+      .addEventListener("change", filterData);
+
+    document
+      .getElementById("riskFilter")
+      .addEventListener("change", filterData);
+
+    // =========================================================
+    // 6. ESTADÍSTICAS
+    // =========================================================
+
+    function updateStats(data) {
+      const total = data.features.length;
+      const critical = data.features.filter(
+        (feature) => feature.properties.riesgo === "Crítico"
+      ).length;
+
+      document.getElementById("totalProjects").textContent = total;
+      document.getElementById("criticalProjects").textContent = critical;
+    }
+
+    // =========================================================
+    // 7. CONTROL DE CAPAS
+    // =========================================================
+
+    const baseMaps = {
+      "Sobria": baseSobria,
+      "OpenStreetMap": baseOSM,
+      "Satelital": baseSatelital
+    };
+
+    const overlayMaps = {
+      "Proyectos mineros": markerCluster
+    };
+
+    L.control.layers(baseMaps, overlayMaps, {
+      collapsed: false,
+      position: "topright"
+    }).addTo(map);
+
+    // =========================================================
+    // 8. INICIALIZACIÓN
+    // =========================================================
+
+    createMiningLayer(proyectosMineros);
+    createHeatLayer(proyectosMineros);
+
+    overlayMaps["Amenaza / calor territorial"] = heatLayer;
+
+    heatLayer.addTo(map);
+
+    L.control.layers(baseMaps, {
+      "Proyectos mineros": markerCluster,
+      "Amenaza / calor territorial": heatLayer
+    }, {
+      collapsed: false,
+      position: "bottomright"
+    }).addTo(map);
+
+    updateStats(proyectosMineros);
+
+    // Ajuste inicial al territorio nacional
+    map.fitBounds([
+      [14.4, -118.5],
+      [32.9, -86.5]
+    ]);
+  </script>
+</body>
+</html>
